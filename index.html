@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Busca de Escalas</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    input[type="text"] {
+      width: 100%;
+      max-width: 600px;
+      padding: 14px 18px;
+      font-size: 1.1em;
+      border-radius: 18px;
+      border: 1.5px solid #bbb;
+      box-sizing: border-box;
+      margin-bottom: 1em;
+      outline: none;
+      transition: border 0.2s;
+    }
+    input[type="text"]:focus {
+      border: 1.5px solid #888;
+    }
+    table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 16px 16px; text-align: left; }
+    th.horario, td.horario { min-width: 130px; width: 170px; white-space: nowrap; }
+    /* Remove nowrap to allow wrapping and avoid horizontal scrolling */
+    td, th { white-space: normal; word-break: break-word; }
+    th { background: #f0f0f0; }
+    /* Day-based row colors - new palette, soft but more distinct */
+    .row-domingo { background: #f8e8d4; }   /* Peach */
+    .row-segunda { background: #d4f0e8; }  /* Mint */
+    .row-terca { background: #e8e4f8; }    /* Lavender */
+    .row-quarta { background: #f8f3d4; }   /* Light Yellow */
+    .row-quinta { background: #d4e8f8; }   /* Sky Blue */
+    .row-sexta { background: #f8d4e8; }    /* Pink */
+    .row-sabado { background: #e8f8d4; }   /* Light Green */
+    /* Zebra striping for better row following */
+    tbody tr:nth-child(odd) { filter: brightness(0.97); }
+    tbody tr:nth-child(even) { filter: brightness(1.03); }
+  </style>
+</head>
+<body>
+  <h1>Buscar Escalas</h1>
+  <input type="text" id="searchInput" placeholder="Busque por Congregação, Capitão, Voluntário(a) ou Telefone..." autofocus />
+  <table id="resultsTable">
+    <thead>
+      <tr id="tableHeader"></tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  <script>
+    let escalas = [];
+    let headers = [];
+
+    // Load escalas.json
+    fetch('escalas.json')
+      .then(response => response.json())
+      .then(data => {
+        escalas = data;
+        if (escalas.length > 0) {
+          headers = Object.keys(escalas[0]);
+          renderTableHeader();
+          renderTable(escalas);
+        }
+      });
+
+    function renderTableHeader() {
+      const headerRow = document.getElementById('tableHeader');
+      headerRow.innerHTML = '';
+      // Compose the merged column header
+      const thMerged = document.createElement('th');
+      thMerged.textContent = 'Resumo';
+      headerRow.appendChild(thMerged);
+      // Render the rest of the headers (skip first 4 and hidden columns)
+      headers.forEach((h, idx) => {
+        if (idx < 4) return;
+        if (h.toLowerCase() === 'tel' || h === 'Telefone Capitao' || h === 'Telefone Capitão') return;
+        const th = document.createElement('th');
+        th.textContent = h;
+        if (h.toLowerCase().includes('horario')) th.classList.add('horario');
+        headerRow.appendChild(th);
+      });
+    }
+
+    function renderTable(rows) {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+      function firstAndLast(name) {
+        if (!name) return '';
+        const parts = name.trim().split(/\s+/);
+        if (parts.length === 1) return parts[0];
+        return parts[0] + ' ' + parts[parts.length - 1];
+      }
+      rows.forEach(row => {
+        const tr = document.createElement('tr');
+        // Assign color class based on Dia
+        let diaForColor = (row['Dia'] || '').toLowerCase();
+        let colorClass = '';
+        switch (diaForColor) {
+          case 'domingo': colorClass = 'row-domingo'; break;
+          case 'segunda': colorClass = 'row-segunda'; break;
+          case 'terça':
+          case 'terca': colorClass = 'row-terca'; break;
+          case 'quarta': colorClass = 'row-quarta'; break;
+          case 'quinta': colorClass = 'row-quinta'; break;
+          case 'sexta': colorClass = 'row-sexta'; break;
+          case 'sábado':
+          case 'sabado': colorClass = 'row-sabado'; break;
+        }
+        if (colorClass) tr.classList.add(colorClass);
+        // Compose merged cell from first 4 columns
+        const mergedTd = document.createElement('td');
+        // Defensive: flatten possible objects/arrays
+        function flat(val) {
+          if (typeof val === 'object' && val !== null) {
+            if (Array.isArray(val)) return val.join(', ');
+            return Object.values(val).join(' ');
+          }
+          return val || '';
+        }
+        const dia = flat(row[headers[1]]);
+        const n = flat(row[headers[0]]);
+        const categoria = flat(row[headers[3]]);
+        const extra = flat(row[headers[2]]);
+        // Format: Dia, Banheiro N, Categoria, Extra
+        let resumo = '';
+        if (dia) resumo += dia;
+        if (n) resumo += (resumo ? ', ' : '') + 'Banheiro ' + n;
+        if (categoria) resumo += (resumo ? ', ' : '') + categoria;
+        if (extra) resumo += (resumo ? ', ' : '') + extra;
+        mergedTd.textContent = resumo;
+        tr.appendChild(mergedTd);
+        // Render the rest of the columns (skip first 4 and hidden columns)
+        headers.forEach((h, idx) => {
+          if (idx < 4) return;
+          if (h.toLowerCase() === 'tel' || h === 'Telefone Capitao' || h === 'Telefone Capitão') return;
+          const td = document.createElement('td');
+          if (h.toLowerCase().includes('horario')) td.classList.add('horario');
+          let value = row[h];
+          if (h === 'Voluntario(a)' || h === 'Capitão') {
+            value = firstAndLast(value);
+          } else if (typeof value === 'object' && value !== null) {
+            // Try to join array or stringify object
+            if (Array.isArray(value)) {
+              value = value.join(', ');
+            } else {
+              value = Object.values(value).join(' ');
+            }
+          }
+          td.textContent = value || '';
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', function() {
+      const query = this.value.trim().toLowerCase();
+      if (!query) {
+        renderTable(escalas);
+        return;
+      }
+      const filtered = escalas.filter(row => {
+        // If input is a number, also search in N (first column)
+        const isNumber = /^\d+$/.test(query);
+        return [
+          row['Congregação'],
+          row['Capitão'],
+          row['Telefone Capitao'],
+          row['Voluntario(a)'],
+          row['Voluntário(a)'] // ensure search in Voluntario(a) (in case of different casing or key)
+        ].some(field => field && field.toLowerCase().includes(query));
+      });
+      renderTable(filtered);
+    });
+  </script>
+</body>
+</html>
