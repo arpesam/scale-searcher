@@ -125,7 +125,14 @@
         // Format: Dia, Banheiro N, Categoria, Extra
         let resumo = '';
         if (dia) resumo += dia;
-        if (n) resumo += (resumo ? ', ' : '') + 'Banheiro ' + n;
+
+        if (n.includes('Sala')) {
+          if (n) resumo += (resumo ? ', ' : '') + n;
+        } else {
+          if (n) resumo += (resumo ? ', ' : '') + 'Banheiro ' + n;
+        }
+        // if (n) resumo += (resumo ? ', ' : '') + 'Banheiro ' + n;
+
         if (categoria) resumo += (resumo ? ', ' : '') + categoria;
         if (extra) resumo += (resumo ? ', ' : '') + extra;
         mergedTd.textContent = resumo;
